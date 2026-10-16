@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Word Counter</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #f2f5fc;
+  color: #20304a;
+  font-family: Arial, sans-serif;
+}
+main {
+  max-width: 1000px;
+  margin: 45px auto;
+  padding: 20px;
+}
+h1 { font-size: 40px; margin-bottom: 10px; }
+.subtitle { color: #63718a; line-height: 1.6; }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin: 25px 0;
+}
+.card, .panel {
+  background: white;
+  border: 1px solid #dfe5f0;
+  border-radius: 15px;
+  padding: 20px;
+}
+.card strong {
+  display: block;
+  font-size: 27px;
+  color: #425dcc;
+  margin-bottom: 8px;
+}
+.card span { font-size: 13px; color: #63718a; }
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+label { font-weight: bold; }
+button {
+  padding: 10px 18px;
+  background: #425dcc;
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+button:hover { background: #3048ae; }
+textarea {
+  width: 100%;
+  min-height: 260px;
+  padding: 15px;
+  border: 1px solid #cbd3e3;
+  border-radius: 10px;
+  font: 16px/1.7 Arial, sans-serif;
+  resize: vertical;
+}
+textarea:focus-visible, button:focus-visible {
+  outline: 3px solid #9baaf3;
+  outline-offset: 3px;
+}
+.hint { color: #63718a; font-size: 13px; line-height: 1.6; }
+.top { margin-top: 20px; }
+h2 { font-size: 20px; }
+#topWords { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip {
+  padding: 10px 14px;
+  background: #edf0ff;
+  color: #364fb6;
+  border-radius: 8px;
+}
+footer {
+  text-align: center;
+  color: #63718a;
+  font-size: 13px;
+  margin-top: 25px;
+}
+@media (max-width: 700px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .card:last-child { grid-column: span 2; }
+  main { margin-top: 15px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Word Counter</h1>
+  <p class="subtitle">
+    Type or paste your text to see your writing statistics instantly.
+  </p>
+
+  <section class="stats" aria-label="Text statistics">
+    <div class="card">
+      <strong id="words">0</strong><span>Words</span>
+    </div>
+    <div class="card">
+      <strong id="characters">0</strong><span>Characters</span>
+    </div>
+    <div class="card">
+      <strong id="noSpaces">0</strong><span>Without spaces</span>
+    </div>
+    <div class="card">
+      <strong id="sentences">0</strong><span>Sentences</span>
+    </div>
+    <div class="card">
+      <strong id="reading">0 sec</strong><span>Reading time</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <label for="text">Your text</label>
+      <button id="clear" type="button">Clear text</button>
+    </div>
+    <textarea id="text"
+      placeholder="Start typing or paste your text here..."
+      aria-describedby="hint"></textarea>
+    <p class="hint" id="hint">
+      Reading speed: 200 words per minute.
+      Extra spaces and empty lines do not count as words.
+    </p>
+  </section>
+
+  <section class="panel top">
+    <h2>Top 5 most-used words</h2>
+    <p class="hint">Ignores “the”, “a” and “and”.</p>
+    <div id="topWords"></div>
+  </section>
+
+  <footer>Your text stays in this tab. Nothing is saved or sent.</footer>
+</main>
+
+<script>
+const input = document.getElementById("text");
+
+function updateStats() {
+  const text = input.value;
+
+  // Count non-empty tokens containing a letter or number.
+  const words = (text.match(/\S+/gu) || [])
+    .filter(word => /[\p{L}\p{N}]/u.test(word));
+
+  const characters = Array.from(text).length;
+  const noSpaces = Array.from(text.replace(/\s/gu, "")).length;
+
+  // Count punctuation-ended sentences and a final unfinished sentence.
+  const sentences = (text.match(/[^.!?]+(?:[.!?]+|$)/gu) || [])
+    .filter(part => /[\p{L}\p{N}]/u.test(part)).length;
+
+  const seconds = Math.ceil(words.length * 60 / 200);
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  const reading = minutes
+    ? minutes + " min" + (remaining ? " " + remaining + " sec" : "")
+    : seconds + " sec";
+
+  document.getElementById("words").textContent = words.length;
+  document.getElementById("characters").textContent = characters;
+  document.getElementById("noSpaces").textContent = noSpaces;
+  document.getElementById("sentences").textContent = sentences;
+  document.getElementById("reading").textContent = reading;
+
+  // Normalize capitalization and ignore punctuation in word frequencies.
+  const normalized = text.normalize("NFC").toLowerCase()
+    .match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu) || [];
+
+  const frequency = new Map();
+  for (const word of normalized) {
+    if (!["the", "a", "and"].includes(word)) {
+      frequency.set(word, (frequency.get(word) || 0) + 1);
+    }
+  }
+
+  const topFive = [...frequency.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5);
+
+  const container = document.getElementById("topWords");
+  container.replaceChildren();
+
+  if (topFive.length === 0) {
+    const message = document.createElement("p");
+    message.className = "hint";
+    message.textContent = "Add text to see your most-used words.";
+    container.appendChild(message);
+  }
+
+  for (const [word, count] of topFive) {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = word + ": " + count;
+    container.appendChild(chip);
+  }
+}
+
+input.addEventListener("input", updateStats);
+
+document.getElementById("clear").addEventListener("click", function () {
+  input.value = "";
+  updateStats();
+  input.focus();
+});
+
+updateStats();
+</script>
+</body>
+</html>
